@@ -24,7 +24,11 @@ async def main():
 @bot.event
 async def on_connect():
     if bot.auto_sync_commands:
-        await bot.sync_commands(guild_ids=[1309197374127607808])
+        TEST_SERVER_ID = os.getenv('TEST_SERVER_ID')
+        if TEST_SERVER_ID is not None:
+            await bot.sync_commands(guild_ids=[TEST_SERVER_ID])
+        else:
+            await bot.sync_commands()
     print(f"{bot.user.name} connected.")
 
 
