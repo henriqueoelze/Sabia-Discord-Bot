@@ -1,5 +1,6 @@
 
 # [WIP] Sabia Bot
+<img src="https://github.com/henriqueoelze/Sabia-Discord-Bot/blob/main/res/images/icon.png" alt="drawing" width="200"/>
 
 This is a simple discord bot that allow you to lister another discord servers to your Forum threads.
 
