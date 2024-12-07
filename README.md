@@ -1,5 +1,5 @@
 
-# [WIP] Annoucement Forwarder
+# [WIP] Sabia Bot
 
 This is a simple discord bot that allow you to lister another discord servers to your Forum threads.
 
