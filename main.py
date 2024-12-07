@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.webhooks = True
 
 bot_prefix = "/"
 bot = commands.Bot(intents=intents)

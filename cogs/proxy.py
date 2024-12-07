@@ -5,7 +5,7 @@ from discord.ext import commands
 from gateways.persistence._interface import PersistenceGateway
 from gateways.persistence.in_memory import InMemoryPersistenceGatewayImpl
 from gateways.persistence.sql_lite import SqlLitePersistenceGatewayImpl
-from models.proxy import Proxy
+from models.proxy import Proxy as ProxyModel
 
 
 def setup(bot):
@@ -38,73 +38,94 @@ class Proxy(commands.Cog):
     ):
         await ctx.respond(f'Error processing your message. Details: {error.args[0]}')
 
-    @discord.slash_command()
-    async def add_proxy_to_channel(
+    @discord.slash_command(description='Add the routing rule from your configuration given the webhook id')
+    async def add_rule(
         self,
         ctx: discord.ApplicationContext,
-        target: discord.TextChannel,
-        filter: discord.Member,
-    ):
-        await self.add_proxy(ctx, target, filter)
-
-
-    @discord.slash_command()
-    async def add_proxy_to_forum(
-        self,
-        ctx: discord.ApplicationContext,
-        target: discord.Thread,
-        filter: discord.Member,
-    ):
-        await self.add_proxy(ctx, target, filter)
-
-    async def add_proxy(
-        self,
-        ctx: discord.ApplicationContext,
-        target: Optional[discord.Thread|discord.TextChannel],
-        filter: discord.Member,
+        webhook_id,
+        destination: discord.Thread,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: Proxy = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
-        server_proxy.add_rule(filter.name, target.id)
+        server_proxy.add_rule(webhook_id, destination.id)
         self.persistenceGateway.store_proxy(server_id, server_proxy)
 
-        await ctx.respond(f'Listening from {server_proxy.get_announce_channel()} to {target} from author {filter}...')
+        await ctx.respond(f'Rule created :white_check_mark: \nWebhook {webhook_id} routed to {destination}')
 
+    @discord.slash_command(description='Remove the routing rule from your configuration given the webhook id')
+    async def remove_rule(
+        self,
+        ctx: discord.ApplicationContext,
+        webhook_id,
+    ):
+        server_id: int = self.get_server_id_from_context(ctx)
+        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
+        if server_proxy is None:
+            return
 
-    @discord.slash_command()
+        server_proxy.remove_rule(webhook_id)
+        self.persistenceGateway.store_proxy(server_id, server_proxy)
+
+        await ctx.respond(f'Rule removed :white_check_mark: \nWebhook {webhook_id} won\'t be routed anymore.')
+
+    @discord.slash_command(description='Set the channel where your server is listening to the other servers messages')
     async def set_announce_channel(
         self,
         ctx: discord.ApplicationContext,
         channel: discord.TextChannel,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: Proxy = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
         server_proxy.set_announce_channel(channel.id)
         self.persistenceGateway.store_proxy(server_id, server_proxy)
 
-        await ctx.respond(f'Announce channel set as {server_proxy.get_announce_channel()}')
+        await ctx.respond(f'Announce channel set as <#{channel.id}>')
 
-    @discord.slash_command()
-    async def print_proxy(
+    @discord.slash_command(description='Print the whole server configuration')
+    async def print_config(
         self,
         ctx: discord.ApplicationContext,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: Proxy = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
+            await ctx.respond('No configuration found!')
             return
 
-        msg = ""
-        for item in self.server_proxy._rules:
-            channel = f'<#{self.proxy.rules[item]}>'
-            msg += f"Sending msg to {channel} if message matches with the filter (author) = {item}"
-            msg += "\n"
+        server_webhooks: list[discord.Webhook] = await ctx.guild.webhooks()
+        server_listeners: list[discord.Webhook] = [
+            webhook for webhook in server_webhooks if webhook.type == discord.WebhookType.channel_follower]
+
+        webhooks_without_rule: list[discord.Webhook] = [
+            webhook for webhook in server_listeners if not server_proxy.has_rule(webhook.id)]
+        msg = ''
+        msg += f'Announcements channel: <#{server_proxy.announce_channel_id}>\n'
+        msg += '\n=> Webhooks WITHOUT configuration: \n'
+
+        if len(webhooks_without_rule) == 0:
+            msg += 'None\n'
+        else:
+            for webhook_id in webhooks_without_rule:
+                msg += f'Webhook id `{webhook_id.id}` `({webhook_id.name})`\n'
+
+
+        msg += '\n=> Webhooks WITH configuration: \n'
+        current_rules = server_proxy.get_all()
+        if len(current_rules) == 0:
+            msg += 'None\n'
+        else:
+            for webhook_id in current_rules:
+                webhook_obj = [
+                    webhook for webhook in server_listeners if webhook.id == int(webhook_id)][0]
+                thread = f'<#{current_rules[webhook_id]}>'
+                msg += f'Webhook id `{webhook_id}` `({webhook_obj.name})` being forward to {thread}.'
+                msg += '\n'
 
         await ctx.respond(msg)
 
@@ -117,7 +138,11 @@ class Proxy(commands.Cog):
         if author == self.bot.user:
             return
 
-        server_proxy: Proxy = self.persistenceGateway.get_proxy(server_id)
+        webhook_id = message.webhook_id
+        if webhook_id is None:
+            return
+
+        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
@@ -126,11 +151,11 @@ class Proxy(commands.Cog):
             return
 
         # # Forwarding message
-        target_channel_id = server_proxy.get_forward_channel(author.name)
+        target_channel_id = server_proxy.get_destination(webhook_id)
         target_channel = self.bot.get_channel(target_channel_id)
         message_data = message.to_reference()
-        link = f"https://discord.com/channels/{message_data.guild_id}/{message_data.channel_id}/{message_data.message_id}"
-        bot_message = f"A new message from {author.mention} arrive! Please check here: {link}"
+        link = f'https://discord.com/channels/{message_data.guild_id}/{message_data.channel_id}/{message_data.message_id}'
+        bot_message = f'A new message from {author.mention} arrive! Please check here: {link}'
         await target_channel.send(bot_message)
 
     def get_server_id_from_context(self, ctx: discord.ApplicationContext) -> int:
