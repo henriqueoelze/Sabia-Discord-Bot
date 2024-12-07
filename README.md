@@ -2,9 +2,9 @@
 # Sabiá Bot
 <img src="https://github.com/henriqueoelze/Sabia-Discord-Bot/blob/main/res/images/icon.png" alt="drawing" width="200"/>
 
-This is a simple discord bot that allow you to lister another discord servers to your Forum threads.
+This is a simple discord bot that allow you to listen to another discord servers to your discord forum threads.
 
-As now (2024), Discord allow you to follow other annoucement channels from any server, but you can ONLY listen to another text channel, not allowing you to send the messages to forum threads, which limits the usability in certain way.
+As now (2024), Discord allow you to follow other announcement channels from any server, but you can ONLY listen to another text channel, not allowing you to send the messages to forum threads, which limits the usability in certain way.
 
 This bot solves that.
 
