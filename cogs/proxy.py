@@ -46,12 +46,12 @@ class Proxy(commands.Cog):
         destination: discord.Thread,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = await self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
         server_proxy.add_rule(webhook_id, destination.id)
-        self.persistenceGateway.store_proxy(server_id, server_proxy)
+        await self.persistenceGateway.store_proxy(server_id, server_proxy)
 
         await ctx.respond(f'Rule created :white_check_mark: \nWebhook {webhook_id} routed to {destination}')
 
@@ -62,12 +62,12 @@ class Proxy(commands.Cog):
         webhook_id,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = await self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
         server_proxy.remove_rule(webhook_id)
-        self.persistenceGateway.store_proxy(server_id, server_proxy)
+        await self.persistenceGateway.store_proxy(server_id, server_proxy)
 
         await ctx.respond(f'Rule removed :white_check_mark: \nWebhook {webhook_id} won\'t be routed anymore.')
 
@@ -78,12 +78,12 @@ class Proxy(commands.Cog):
         channel: discord.TextChannel,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = await self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
         server_proxy.set_announce_channel(channel.id)
-        self.persistenceGateway.store_proxy(server_id, server_proxy)
+        await self.persistenceGateway.store_proxy(server_id, server_proxy)
 
         await ctx.respond(f'Announce channel set as <#{channel.id}>')
 
@@ -93,7 +93,7 @@ class Proxy(commands.Cog):
         ctx: discord.ApplicationContext,
     ):
         server_id: int = self.get_server_id_from_context(ctx)
-        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = await self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             await ctx.respond('No configuration found!')
             return
@@ -113,7 +113,6 @@ class Proxy(commands.Cog):
         else:
             for webhook_id in webhooks_without_rule:
                 msg += f'Webhook id `{webhook_id.id}` `({webhook_id.name})`\n'
-
 
         msg += '\n=> Webhooks WITH configuration: \n'
         current_rules = server_proxy.get_all()
@@ -142,7 +141,7 @@ class Proxy(commands.Cog):
         if webhook_id is None:
             return
 
-        server_proxy: ProxyModel = self.persistenceGateway.get_proxy(server_id)
+        server_proxy: ProxyModel = await self.persistenceGateway.get_proxy(server_id)
         if server_proxy is None:
             return
 
