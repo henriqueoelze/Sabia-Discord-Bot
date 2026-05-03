@@ -78,3 +78,6 @@ venv.bak/
 dmypy.json
 
 .idea/
+
+# Discord
+discord_dev/
